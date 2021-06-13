@@ -1,11 +1,11 @@
 import tkinter
-from random import randrange
+from random import randrange, choice, random
 
 class GameOf2048State:
     def __init__(self, tile_values, score):
         self.tile_values = tile_values
         self.score = score
-        self.valid_actions = self.get_valid_actions_2()
+        self.update_valid_actions()
         
     def copy(self):
         result = GameOf2048State(self.tile_values, self.score)
@@ -20,7 +20,7 @@ class GameOf2048State:
     def get_valid_actions(self):
         return self.valid_actions
         
-    def get_valid_actions_2(self):
+    def update_valid_actions(self):
         valid_actions = []
         # tvwd: tile_values_with_dummy
         # Check up
@@ -84,8 +84,139 @@ class GameOf2048State:
                 for i in range(0, 16) if i % 4 != 3
         ]):
             valid_actions.append("right")
-            
-        return valid_actions
+
+        self.valid_actions = valid_actions.copy()
+        
+    def align_up(self):
+        def move_zero_tiles():
+            # Identify move_distance
+            empty_tile_in_col = [0, 0, 0, 0]
+            move_distance = [0 for _ in range(16)]
+            for i in range(0, 16):
+                if self.tile_values[i] == 0:
+                    empty_tile_in_col[i % 4] += 1
+                else:
+                    move_distance[i] = empty_tile_in_col[i % 4]
+        
+            # Execute movement
+            for i in range(4, 16):
+                if move_distance[i] > 0:
+                    self.tile_values[i - 4 * move_distance[i]] = self.tile_values[i]
+                    self.tile_values[i] = 0
+        
+        
+        move_zero_tiles()
+        
+        # Joining same tile
+        for i in range(12):
+            if self.tile_values[i] == self.tile_values[i + 4]:
+                self.tile_values[i] *= 2
+                self.score += self.tile_values[i]
+                self.tile_values[i + 4] = 0
+        
+        move_zero_tiles()
+        
+        self.update_valid_actions()
+
+    def align_down(self):
+        def move_zero_tiles():
+            # Identify move_distance
+            empty_tile_in_col = [0, 0, 0, 0]
+            move_distance = [0 for _ in range(16)]
+            for i in range(15, -1, -1):
+                if self.tile_values[i] == 0:
+                    empty_tile_in_col[i % 4] += 1
+                else:
+                    move_distance[i] = empty_tile_in_col[i % 4]
+        
+            # Execute movement
+            for i in range(12, -1, -1):
+                if move_distance[i] > 0:
+                    self.tile_values[i + 4 * move_distance[i]] = self.tile_values[i]
+                    self.tile_values[i] = 0
+        
+        move_zero_tiles()
+        
+        for i in range(15, 3, -1):
+            if self.tile_values[i] == self.tile_values[i - 4]:
+                self.tile_values[i] *= 2
+                self.score += self.tile_values[i]
+                self.tile_values[i - 4] = 0
+                
+        move_zero_tiles()
+        
+        self.update_valid_actions()
+
+    def align_left(self):
+        def move_zero_tiles():
+            # Identify move_distance
+            move_distance = [0 for _ in range(16)]
+            for r in range(4):
+                empty_tile_in_row = 0
+                for c in range(4):
+                    if self.tile_values[4 * r + c] == 0:
+                        empty_tile_in_row += 1
+                    else:
+                        move_distance[4 * r + c] = empty_tile_in_row
+        
+            # Execute movement
+            for i in range(16):
+                if i % 4 != 0:
+                    if move_distance[i] > 0:
+                        self.tile_values[i - move_distance[i]] = self.tile_values[i]
+                        self.tile_values[i] = 0
+        
+        move_zero_tiles()
+        
+        for i in range(16):
+            if i % 4 != 3:
+                if self.tile_values[i] == self.tile_values[i + 1]:
+                    self.tile_values[i] *= 2
+                    self.score += self.tile_values[i]
+                    self.tile_values[i + 1] = 0
+                
+        move_zero_tiles()
+        
+        self.update_valid_actions()
+
+    def align_right(self):
+        def move_zero_tiles():
+            # Identify move_distance
+            move_distance = [0 for _ in range(16)]
+            for r in range(4):
+                empty_tile_in_row = 0
+                for c in range(3, -1, -1):
+                    if self.tile_values[4 * r + c] == 0:
+                        empty_tile_in_row += 1
+                    else:
+                        move_distance[4 * r + c] = empty_tile_in_row
+        
+            # Execute movement
+            for i in range(15, -1, -1):
+                if i % 4 != 3:
+                    if move_distance[i] > 0:
+                        self.tile_values[i + move_distance[i]] = self.tile_values[i]
+                        self.tile_values[i] = 0
+        
+        move_zero_tiles()
+        
+        for i in range(15, 0, -1): # i == 0 tidak digunakan
+            if i % 4 != 0:
+                if self.tile_values[i] == self.tile_values[i - 1]:
+                    self.tile_values[i] *= 2
+                    self.score += self.tile_values[i]
+                    self.tile_values[i - 1] = 0
+                
+        move_zero_tiles()
+        
+        self.update_valid_actions()
+        
+    def get_empty_tile_indexes(self):
+        return [i for i in range(16) if self.tile_values[i] == 0]
+        
+    def put_random_tile(self):
+        self.tile_values[choice(self.get_empty_tile_indexes())] = 2 if random() < 0.8 else 4
+        self.update_valid_actions()
 
 
 window = tkinter.Tk()
@@ -101,13 +232,16 @@ rectangles = []
 texts = []
 current_state = GameOf2048State(
     [
-        1024, 0, 16, 32,
-        2048, 0, 8, 64,
-        4096, 0, 2, 256,
-        8192, 512, 4, 128,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0
     ],
     0
 )
+current_state.put_random_tile()
+current_state.put_random_tile()
+
 colors = { # From https://colorpalettes.net/color-palette-3666/
     0: "#cdd4ca",
     2: "#ffd66c",
@@ -129,6 +263,7 @@ colors = { # From https://colorpalettes.net/color-palette-3666/
 }
 
 current_tile_values = current_state.get_tile_values()
+
 for row in range(4):
     for col in range(4):
         current_value = current_tile_values[row * 4 + col]
@@ -177,25 +312,33 @@ canvas.pack()
 
 def up_action(event = None):
     if "up" in current_state.get_valid_actions():
-        print("Up")
+        current_state.align_up()
+        current_state.put_random_tile()
+        update_display(current_state)
     else:
         print("You can\'t")
     
 def down_action(event = None):
     if "down" in current_state.get_valid_actions():
-        print("Down")
+        current_state.align_down()
+        current_state.put_random_tile()
+        update_display(current_state)
     else:
         print("You can\'t")
 
 def left_action(event = None):
     if "left" in current_state.get_valid_actions():
-        print("Left")
+        current_state.align_left()
+        current_state.put_random_tile()
+        update_display(current_state)
     else:
         print("You can\'t")
     
 def right_action(event = None):
     if "right" in current_state.get_valid_actions():
-        print("Right")
+        current_state.align_right()
+        current_state.put_random_tile()
+        update_display(current_state)
     else:
         print("You can\'t")
 
